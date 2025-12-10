@@ -355,10 +355,12 @@ def main():
         
         # Debug info
         if len(all_districts_list) == 0:
-            st.sidebar.error(f"⚠️ No districts in data! Columns: {list(original_data.columns)}")
+            st.sidebar.error(f"⚠️ No districts in data! Expected 5 districts. Columns: {list(original_data.columns)}")
             st.sidebar.info("Sample data:")
             if len(original_data) > 0:
                 st.sidebar.write(original_data[['turbine_id', 'district']].head() if 'district' in original_data.columns else original_data.head())
+        elif len(all_districts_list) < 5:
+            st.sidebar.warning(f"⚠️ Only {len(all_districts_list)} districts found. Expected 5.")
         
         # Add "All Districts" option
         district_options = ["All Districts"] + all_districts_list if len(all_districts_list) > 0 else ["All Districts"]
