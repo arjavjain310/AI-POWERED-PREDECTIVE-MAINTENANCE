@@ -274,14 +274,14 @@ def main():
     
     # Global filters
     turbine_ids = sorted(data['turbine_id'].unique())
+    all_districts = sorted(data['district'].unique()) if 'district' in data.columns else []
     
     # District filter dropdown (if available)
-    if 'district' in data.columns:
-        districts = sorted(data['district'].unique())
+    if 'district' in data.columns and len(all_districts) > 0:
         st.sidebar.markdown("### 📍 Karnataka Districts")
         
         # Add "All Districts" option
-        district_options = ["All Districts"] + districts
+        district_options = ["All Districts"] + all_districts
         selected_district = st.sidebar.selectbox(
             "Select District",
             district_options,
@@ -290,17 +290,25 @@ def main():
         )
         
         if selected_district != "All Districts":
-            data = data[data['district'] == selected_district]
-            turbine_ids = sorted(data['turbine_id'].unique())
-            st.sidebar.info(f"📍 Showing data for: **{selected_district}**")
+            filtered_data_by_district = data[data['district'] == selected_district].copy()
+            turbine_ids = sorted(filtered_data_by_district['turbine_id'].unique())
+            st.sidebar.info(f"📍 Showing data for: **{selected_district}** ({len(turbine_ids)} turbines)")
         else:
-            st.sidebar.info(f"📍 Showing data for: **All Districts** ({len(districts)} districts)")
+            turbine_ids = sorted(data['turbine_id'].unique())
+            st.sidebar.info(f"📍 Showing data for: **All Districts** ({len(all_districts)} districts, {len(turbine_ids)} turbines)")
+    else:
+        selected_district = "All Districts"
+        filtered_data_by_district = data
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🌬️ Turbine Selection")
     
     # Limit to maximum 9 turbines
-    max_turbines = min(9, len(turbine_ids))
+    max_turbines = min(9, len(turbine_ids)) if len(turbine_ids) > 0 else 9
+    
+    if len(turbine_ids) == 0:
+        st.sidebar.warning("⚠️ No turbines available. Please check data.")
+        return
     
     selected_turbines = st.sidebar.multiselect(
         f"Select Turbines (Max {max_turbines})",
@@ -310,10 +318,9 @@ def main():
         max_selections=max_turbines
     )
     
-    # Enforce maximum limit
-    if len(selected_turbines) > max_turbines:
-        selected_turbines = selected_turbines[:max_turbines]
-        st.sidebar.warning(f"⚠️ Maximum {max_turbines} turbines allowed. Showing first {max_turbines}.")
+    # Apply district filter to data if district was selected
+    if selected_district != "All Districts" and 'district' in data.columns:
+        data = data[data['district'] == selected_district].copy()
     
     if len(selected_turbines) == 0:
         st.warning("Please select at least one turbine")
