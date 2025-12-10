@@ -172,7 +172,7 @@ def compute_turbine_summary(data: pd.DataFrame):
 
 def main():
     """Main dashboard function."""
-    st.markdown('<div class="main-header">🌬️ Wind Turbine Predictive Maintenance Dashboard</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🔧 PREDICTIVE MAINTENANCE DASHBOARD</div>', unsafe_allow_html=True)
     st.markdown("---")
     
     # Sidebar with enhanced navigation
@@ -299,12 +299,21 @@ def main():
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🌬️ Turbine Selection")
     
+    # Limit to maximum 9 turbines
+    max_turbines = min(9, len(turbine_ids))
+    
     selected_turbines = st.sidebar.multiselect(
-        "Select Turbines",
+        f"Select Turbines (Max {max_turbines})",
         turbine_ids,
-        default=turbine_ids[:5] if len(turbine_ids) > 5 else turbine_ids,
-        key="turbine_selector"
+        default=turbine_ids[:min(5, max_turbines)] if len(turbine_ids) > 0 else [],
+        key="turbine_selector",
+        max_selections=max_turbines
     )
+    
+    # Enforce maximum limit
+    if len(selected_turbines) > max_turbines:
+        selected_turbines = selected_turbines[:max_turbines]
+        st.sidebar.warning(f"⚠️ Maximum {max_turbines} turbines allowed. Showing first {max_turbines}.")
     
     if len(selected_turbines) == 0:
         st.warning("Please select at least one turbine")
@@ -555,9 +564,30 @@ def show_turbine_analysis(data: pd.DataFrame, config: dict):
     """Enhanced turbine analysis page with interactive charts."""
     st.header("🔍 Turbine Deep Analysis")
     
-    # Turbine selector
+    # Turbine selector - allow multiple turbines (max 9)
     turbine_ids = sorted(data['turbine_id'].unique())
-    selected_turbine = st.selectbox("Select Turbine", turbine_ids, key="turbine_selector")
+    max_turbines = min(9, len(turbine_ids))
+    
+    st.subheader("Select Turbines to Analyze")
+    selected_turbines = st.multiselect(
+        f"Choose Turbines (Select up to {max_turbines})",
+        turbine_ids,
+        default=[turbine_ids[0]] if len(turbine_ids) > 0 else [],
+        key="turbine_analysis_selector",
+        max_selections=max_turbines
+    )
+    
+    if len(selected_turbines) == 0:
+        st.warning("Please select at least one turbine to analyze.")
+        return
+    
+    # If multiple turbines selected, show comparison view
+    if len(selected_turbines) > 1:
+        show_turbine_comparison(data, selected_turbines, config)
+        return
+    
+    # Single turbine analysis
+    selected_turbine = selected_turbines[0]
     
     # Filter data
     turbine_data = data[data['turbine_id'] == selected_turbine].copy()
@@ -814,6 +844,99 @@ def show_turbine_analysis(data: pd.DataFrame, config: dict):
             color_continuous_midpoint=0
         )
         fig.add_hline(y=0, line_dash="dash", line_color="black")
+        st.plotly_chart(fig, use_container_width=True)
+
+
+def show_turbine_comparison(data: pd.DataFrame, selected_turbines: list, config: dict):
+    """Show comparison view for multiple turbines."""
+    st.subheader(f"📊 Comparing {len(selected_turbines)} Turbines")
+    
+    # Filter data for selected turbines
+    comparison_data = data[data['turbine_id'].isin(selected_turbines)].copy()
+    
+    # Summary metrics comparison
+    st.subheader("Key Metrics Comparison")
+    
+    turbine_summary = compute_turbine_summary(comparison_data)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("⚡ Avg Power", f"{turbine_summary['avg_power'].mean():.1f} kW")
+    with col2:
+        st.metric("💨 Avg Wind", f"{turbine_summary['avg_wind_speed'].mean():.1f} m/s")
+    with col3:
+        st.metric("🌡️ Avg Temp", f"{turbine_summary['avg_gearbox_temp'].mean():.1f}°C")
+    with col4:
+        st.metric("⚠️ Failures", f"{turbine_summary['total_failures'].sum()}")
+    
+    # Comparison charts
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig = px.bar(
+            turbine_summary,
+            x='turbine_id',
+            y='avg_power',
+            title="Average Power Output by Turbine",
+            labels={'turbine_id': 'Turbine ID', 'avg_power': 'Power (kW)'},
+            color='avg_power',
+            color_continuous_scale='Viridis',
+            template=plotly_template
+        )
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        fig = px.bar(
+            turbine_summary,
+            x='turbine_id',
+            y='failure_probability',
+            title="Failure Probability by Turbine",
+            labels={'turbine_id': 'Turbine ID', 'failure_probability': 'Failure Probability'},
+            color='failure_probability',
+            color_continuous_scale='Reds',
+            template=plotly_template
+        )
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Time-series comparison
+    st.subheader("Time-Series Comparison")
+    
+    feature_to_compare = st.selectbox(
+        "Select Feature to Compare",
+        ['power_output', 'wind_speed', 'gearbox_oil_temperature', 'vibration_level_gearbox'],
+        key="comparison_feature"
+    )
+    
+    if feature_to_compare:
+        fig = go.Figure()
+        colors = px.colors.qualitative.Set1
+        
+        for i, turbine_id in enumerate(selected_turbines):
+            turbine_data = comparison_data[comparison_data['turbine_id'] == turbine_id].sort_values('timestamp')
+            # Sample for performance
+            if len(turbine_data) > 1000:
+                turbine_data = turbine_data.iloc[::len(turbine_data)//1000]
+            
+            fig.add_trace(go.Scatter(
+                x=turbine_data['timestamp'],
+                y=turbine_data[feature_to_compare],
+                name=f"Turbine {turbine_id}",
+                line=dict(color=colors[i % len(colors)], width=2),
+                mode='lines'
+            ))
+        
+        fig.update_layout(
+            title=f"{feature_to_compare.replace('_', ' ').title()} Comparison",
+            xaxis_title="Timestamp",
+            yaxis_title=feature_to_compare.replace('_', ' ').title(),
+            height=500,
+            template=plotly_template,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
         st.plotly_chart(fig, use_container_width=True)
 
 
