@@ -258,10 +258,11 @@ def main():
         if not st.session_state.data_loaded or data_file:
             with st.spinner("Loading data..."):
                 data = load_data_cached(data_path)
+                # Clear cache to ensure fresh data
                 st.session_state.data = data
                 st.session_state.data_loaded = True
         else:
-            data = st.session_state.data
+            data = st.session_state.data.copy()  # Use copy to avoid modifying cached data
     except Exception as e:
         st.error(f"Error loading data: {e}")
         st.info("💡 **Solution:** The dashboard will try to generate sample data automatically.")
@@ -272,11 +273,20 @@ def main():
             st.rerun()  # Retry with data generation
         return
     
-    # Global filters - get counts from full dataset BEFORE filtering
-    all_turbine_ids = sorted(data['turbine_id'].unique())
-    all_districts_list = sorted(data['district'].unique()) if 'district' in data.columns else []
+    # Global filters - get counts from FULL dataset BEFORE any filtering
+    # Store original data for counting
+    original_data = data.copy()
+    all_turbine_ids = sorted(original_data['turbine_id'].unique())
+    all_districts_list = sorted(original_data['district'].unique()) if 'district' in original_data.columns else []
     total_turbines = len(all_turbine_ids)
     total_districts = len(all_districts_list)
+    
+    # Calculate turbines per district from original data
+    turbines_per_district = {}
+    if 'district' in original_data.columns:
+        for district in all_districts_list:
+            district_data = original_data[original_data['district'] == district]
+            turbines_per_district[district] = district_data['turbine_id'].nunique()
     
     # District filter dropdown (if available)
     if 'district' in data.columns and len(all_districts_list) > 0:
@@ -293,13 +303,15 @@ def main():
         
         # Filter data based on district selection
         if selected_district != "All Districts":
-            data = data[data['district'] == selected_district].copy()
+            data = original_data[original_data['district'] == selected_district].copy()
             turbine_ids = sorted(data['turbine_id'].unique())
-            num_turbines_in_district = len(turbine_ids)
-            st.sidebar.info(f"📍 **{selected_district}**\n\n🌬️ {num_turbines_in_district} turbines")
+            # Get count from pre-calculated dictionary
+            num_turbines_in_district = turbines_per_district.get(selected_district, len(turbine_ids))
+            st.sidebar.info(f"📍 **{selected_district}**\n\n🌬️ **{num_turbines_in_district} turbines**")
         else:
+            data = original_data.copy()
             turbine_ids = all_turbine_ids
-            st.sidebar.info(f"📍 **All Districts**\n\n📊 {total_districts} districts\n🌬️ {total_turbines} turbines")
+            st.sidebar.info(f"📍 **All Districts**\n\n📊 **{total_districts} districts**\n🌬️ **{total_turbines} turbines**")
     else:
         selected_district = "All Districts"
         turbine_ids = all_turbine_ids
