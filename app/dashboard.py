@@ -231,10 +231,10 @@ def main():
                 temp_path = data_dir / "wind_turbine_scada_karnataka.csv"
                 
                 generator = SyntheticSCADAGenerator(
-                    num_turbines=8,  # Smaller for quick generation
+                    num_turbines=30,  # Full dataset with all districts
                     start_date="2023-01-01",
-                    end_date="2023-09-30",  # 9 months for faster generation
-                    interval_minutes=20,  # Less frequent for smaller file
+                    end_date="2023-12-31",  # Full year
+                    interval_minutes=10,  # Standard interval
                     region="Karnataka"
                 )
                 df = generator.generate_all_data(save_path=str(temp_path), distribute_districts=True)
@@ -276,6 +276,31 @@ def main():
     # Global filters - get counts from FULL dataset BEFORE any filtering
     # Store original data for counting
     original_data = data.copy()
+    
+    # Debug: Check if district column exists
+    if 'district' not in original_data.columns:
+        st.sidebar.warning("⚠️ District column not found in data. Generating with districts...")
+        # Try to regenerate data with districts
+        try:
+            from src.data.synthetic_data_generator import SyntheticSCADAGenerator
+            data_dir = Path("data/raw")
+            data_dir.mkdir(parents=True, exist_ok=True)
+            temp_path = data_dir / "wind_turbine_scada_karnataka.csv"
+            
+            generator = SyntheticSCADAGenerator(
+                num_turbines=30,
+                start_date="2023-01-01",
+                end_date="2023-12-31",
+                interval_minutes=10,
+                region="Karnataka"
+            )
+            original_data = generator.generate_all_data(save_path=str(temp_path), distribute_districts=True)
+            st.session_state.data = original_data
+            st.session_state.data_loaded = False
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"Error: {e}")
+    
     all_turbine_ids = sorted(original_data['turbine_id'].unique())
     all_districts_list = sorted(original_data['district'].unique()) if 'district' in original_data.columns else []
     total_turbines = len(all_turbine_ids)
@@ -283,17 +308,26 @@ def main():
     
     # Calculate turbines per district from original data
     turbines_per_district = {}
-    if 'district' in original_data.columns:
+    if 'district' in original_data.columns and len(all_districts_list) > 0:
         for district in all_districts_list:
             district_data = original_data[original_data['district'] == district]
             turbines_per_district[district] = district_data['turbine_id'].nunique()
+    else:
+        st.sidebar.warning(f"⚠️ No districts found. Districts column exists: {'district' in original_data.columns}, Districts found: {len(all_districts_list)}")
     
     # District filter dropdown (if available)
-    if 'district' in data.columns and len(all_districts_list) > 0:
+    if 'district' in original_data.columns:
         st.sidebar.markdown("### 📍 Karnataka Districts")
         
+        # Debug info
+        if len(all_districts_list) == 0:
+            st.sidebar.error(f"⚠️ No districts in data! Columns: {list(original_data.columns)}")
+            st.sidebar.info("Sample data:")
+            if len(original_data) > 0:
+                st.sidebar.write(original_data[['turbine_id', 'district']].head() if 'district' in original_data.columns else original_data.head())
+        
         # Add "All Districts" option
-        district_options = ["All Districts"] + all_districts_list
+        district_options = ["All Districts"] + all_districts_list if len(all_districts_list) > 0 else ["All Districts"]
         selected_district = st.sidebar.selectbox(
             "Select District",
             district_options,
