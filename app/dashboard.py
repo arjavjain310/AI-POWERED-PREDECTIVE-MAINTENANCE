@@ -195,53 +195,67 @@ def main():
         st.info("Please ensure config.yaml exists in src/config/")
         return
     
-    # Load data
-    data_path = config['data']['synthetic_data_file']
+    # Load data - try multiple paths
+    data_path = config.get('data', {}).get('synthetic_data_file', 'data/raw/wind_turbine_scada_karnataka.csv')
     
     # Try multiple paths for deployment
     possible_paths = [
         data_path,
+        "data/raw/wind_turbine_scada_karnataka.csv",
+        "data/raw/wind_turbine_scada.csv",
         Path("data/raw/wind_turbine_scada_karnataka.csv"),
         Path("data/raw/wind_turbine_scada.csv"),
     ]
     
     data_file = None
     for path in possible_paths:
-        if Path(path).exists():
-            data_file = path
+        path_obj = Path(path) if not isinstance(path, Path) else path
+        if path_obj.exists():
+            data_file = str(path_obj)
             break
     
+    # Generate data if not found (for deployment)
     if data_file is None:
-        # Generate data on the fly if not found (for deployment)
-        with st.spinner("Generating sample data (this may take a moment)..."):
+        st.info("📊 Data file not found. Generating sample data for demonstration...")
+        with st.spinner("Generating Karnataka wind farm data (this may take 30-60 seconds)..."):
             try:
                 from src.data.synthetic_data_generator import SyntheticSCADAGenerator
                 import tempfile
                 import os
                 
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
-                temp_path = temp_file.name
-                temp_file.close()
+                # Create data directory if it doesn't exist
+                data_dir = Path("data/raw")
+                data_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Generate smaller dataset for quick loading
+                temp_path = data_dir / "wind_turbine_scada_karnataka.csv"
                 
                 generator = SyntheticSCADAGenerator(
-                    num_turbines=5,  # Smaller for quick generation
+                    num_turbines=8,  # Smaller for quick generation
                     start_date="2023-01-01",
-                    end_date="2023-06-30",  # 6 months for faster generation
-                    interval_minutes=30,  # Less frequent for smaller file
+                    end_date="2023-09-30",  # 9 months for faster generation
+                    interval_minutes=20,  # Less frequent for smaller file
                     region="Karnataka"
                 )
-                df = generator.generate_all_data(save_path=temp_path, distribute_districts=False)
-                data_file = temp_path
-                st.success("✅ Sample data generated!")
+                df = generator.generate_all_data(save_path=str(temp_path), distribute_districts=True)
+                data_file = str(temp_path)
+                st.success("✅ Sample data generated successfully!")
+                st.cache_data.clear()  # Clear cache to reload new data
             except Exception as e:
-                st.error(f"Could not generate data: {e}")
-                st.info("Please ensure data file exists or check the error above.")
+                st.error(f"❌ Could not generate data: {str(e)}")
+                st.info("💡 **Troubleshooting:**")
+                st.info("1. Check that all dependencies are installed")
+                st.info("2. Try running locally first: `python src/data/synthetic_data_generator.py`")
+                st.info("3. For deployment, ensure data generation works in cloud environment")
+                import traceback
+                with st.expander("Show error details"):
+                    st.code(traceback.format_exc())
                 return
     else:
         data_path = data_file
     
     try:
-        if not st.session_state.data_loaded:
+        if not st.session_state.data_loaded or data_file:
             with st.spinner("Loading data..."):
                 data = load_data_cached(data_path)
                 st.session_state.data = data
@@ -250,6 +264,12 @@ def main():
             data = st.session_state.data
     except Exception as e:
         st.error(f"Error loading data: {e}")
+        st.info("💡 **Solution:** The dashboard will try to generate sample data automatically.")
+        st.info("If this persists, please generate data first:")
+        st.code("python src/data/synthetic_data_generator.py")
+        # Try to generate data automatically
+        if 'data_file' in locals() and data_file is None:
+            st.rerun()  # Retry with data generation
         return
     
     # Global filters
