@@ -230,11 +230,11 @@ def main():
                 # Generate smaller dataset for quick loading
                 temp_path = data_dir / "wind_turbine_scada_karnataka.csv"
                 
-                # Generate data with all 10 districts
-                # IMPORTANT: Need at least 10 turbines to distribute across 10 districts
-                st.info("🔄 Generating data with all 10 Karnataka districts...")
+                # Generate data with 5 districts and 10 turbines
+                # 10 turbines = 2 per district across 5 districts
+                st.info("🔄 Generating data with 5 Karnataka districts and 10 turbines...")
                 generator = SyntheticSCADAGenerator(
-                    num_turbines=30,  # 30 turbines = 3 per district across 10 districts
+                    num_turbines=10,  # 10 turbines = 2 per district across 5 districts
                     start_date="2023-01-01",
                     end_date="2023-12-31",  # Full year
                     interval_minutes=10,  # Standard interval
@@ -248,14 +248,14 @@ def main():
                     districts_generated = df['district'].nunique()
                     turbines_generated = df['turbine_id'].nunique()
                     
-                    if districts_generated < 10:
-                        st.error(f"❌ Only {districts_generated} districts generated. Expected 10.")
+                    if districts_generated < 5:
+                        st.error(f"❌ Only {districts_generated} districts generated. Expected 5.")
                         st.info("🔄 Regenerating with explicit district assignment...")
                         # Regenerate ensuring all districts
                         all_data = []
                         turbine_id = 1
                         from src.data.synthetic_data_generator import KARNATAKA_DISTRICTS
-                        turbines_per_district = 30 // len(KARNATAKA_DISTRICTS)  # 3 per district
+                        turbines_per_district = 10 // len(KARNATAKA_DISTRICTS)  # 2 per district
                         
                         for district in KARNATAKA_DISTRICTS:
                             generator.district = district

@@ -17,18 +17,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Karnataka wind farm districts (expanded list)
+# Karnataka wind farm districts (5 main districts)
 KARNATAKA_DISTRICTS = [
     'Chitradurga',    # Known for strong winds
     'Gadag',          # Moderate to high wind speeds
     'Davangere',      # Good wind resource potential
     'Koppal',         # Emerging wind farm location
-    'Vijayapura',     # (Bijapur) Good wind potential
-    'Bagalkot',       # Wind energy development
-    'Belagavi',       # (Belgaum) Growing wind sector
-    'Raichur',        # Wind farm installations
-    'Ballari',        # (Bellary) Established wind farms
-    'Tumakuru'        # (Tumkur) Wind energy hub
+    'Vijayapura'      # (Bijapur) Good wind potential
 ]
 
 
@@ -100,12 +95,7 @@ class SyntheticSCADAGenerator:
             'Gadag': 8.5,          # Moderate to high wind speeds
             'Davangere': 8.0,      # Good wind resource potential
             'Koppal': 8.2,         # Emerging wind farm location
-            'Vijayapura': 7.8,     # (Bijapur) Good wind potential
-            'Bagalkot': 7.5,       # Wind energy development
-            'Belagavi': 8.3,       # (Belgaum) Growing wind sector
-            'Raichur': 8.1,        # Wind farm installations
-            'Ballari': 8.7,        # (Bellary) Established wind farms
-            'Tumakuru': 8.4        # (Tumkur) Wind energy hub
+            'Vijayapura': 7.8      # (Bijapur) Good wind potential
         }
         base_speed = base_speed or district_bases.get(self.district, 8.5)
         
@@ -461,12 +451,11 @@ def main():
     # Generate data for Karnataka wind farms
     print("=" * 60)
     print("Generating SCADA Data for Karnataka Wind Farms")
-    print("Districts: Chitradurga, Gadag, Davangere, Koppal, Vijayapura,")
-    print("          Bagalkot, Belagavi, Raichur, Ballari, Tumakuru")
+    print("Districts: Chitradurga, Gadag, Davangere, Koppal, Vijayapura")
     print("=" * 60)
     
     generator = SyntheticSCADAGenerator(
-        num_turbines=30,  # More turbines across all districts
+        num_turbines=10,  # 10 turbines across 5 districts (2 per district)
         start_date="2023-01-01",
         end_date="2023-12-31",
         interval_minutes=10,
