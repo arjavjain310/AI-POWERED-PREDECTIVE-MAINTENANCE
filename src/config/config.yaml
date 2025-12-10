@@ -1,0 +1,90 @@
+# Configuration file for Wind Turbine Predictive Maintenance System
+
+# Data Configuration
+data:
+  raw_data_path: "data/raw"
+  processed_data_path: "data/processed"
+  synthetic_data_file: "data/raw/wind_turbine_scada_karnataka.csv"
+  num_turbines: 10
+  data_start_date: "2023-01-01"
+  data_end_date: "2023-12-31"
+  sampling_interval_minutes: 10
+  
+# Data Splits
+splits:
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  split_by: "time"  # "time" or "turbine"
+  
+# Feature Engineering
+features:
+  lag_features: [1, 3, 6]  # Number of previous timestamps
+  rolling_windows_hours: [1, 6, 24]  # Rolling statistics windows
+  rolling_stats: ["mean", "std", "min", "max"]
+  
+# Model Configuration
+models:
+  # Baseline Models
+  baseline:
+    random_forest:
+      n_estimators: 100
+      max_depth: 20
+      random_state: 42
+    xgboost:
+      n_estimators: 100
+      max_depth: 6
+      learning_rate: 0.1
+      random_state: 42
+  
+  # Deep Learning Models
+  deep_learning:
+    framework: "pytorch"  # "pytorch" or "tensorflow"
+    device: "auto"  # "auto", "cpu", or "cuda"
+    
+    # MLP Configuration
+    mlp:
+      hidden_layers: [128, 64, 32]
+      dropout: 0.3
+      activation: "relu"
+      learning_rate: 0.001
+      batch_size: 64
+      epochs: 50
+      early_stopping_patience: 10
+    
+    # LSTM Configuration
+    lstm:
+      hidden_size: 64
+      num_layers: 2
+      dropout: 0.3
+      sequence_length: 24  # Number of timestamps in sequence
+      learning_rate: 0.001
+      batch_size: 32
+      epochs: 50
+      early_stopping_patience: 10
+
+# Prediction Horizon
+prediction:
+  failure_horizon_hours: 24  # Predict failure in next N hours
+  rul_max_hours: 720  # Maximum RUL to predict (30 days)
+
+# Maintenance Rules
+maintenance:
+  failure_probability_threshold: 0.7  # Flag if failure prob > this
+  rul_threshold_hours: 48  # Flag if RUL < this
+  maintenance_duration_hours: 8  # Hours needed per maintenance
+  preventive_cost: 1000  # Cost of preventive maintenance
+  corrective_cost: 5000  # Cost of corrective maintenance
+
+# Paths
+paths:
+  model_save_dir: "models/saved"
+  log_dir: "logs"
+  plots_dir: "plots"
+
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/project.log"
+
