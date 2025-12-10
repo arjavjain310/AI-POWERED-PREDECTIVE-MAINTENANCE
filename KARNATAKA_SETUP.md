@@ -2,10 +2,17 @@
 
 ## Overview
 
-This project is specifically designed for **Karnataka wind farms** in districts:
+This project is specifically designed for **Karnataka wind farms** across **10 districts**:
 - **Chitradurga** - Known for strong wind patterns
 - **Gadag** - Moderate to high wind speeds
 - **Davangere** - Good wind resource potential
+- **Koppal** - Emerging wind farm location
+- **Vijayapura** (Bijapur) - Good wind potential
+- **Bagalkot** - Wind energy development
+- **Belagavi** (Belgaum) - Growing wind sector
+- **Raichur** - Wind farm installations
+- **Ballari** (Bellary) - Established wind farms
+- **Tumakuru** (Tumkur) - Wind energy hub
 
 ## Problem Statement
 
@@ -53,10 +60,9 @@ The synthetic data generator creates realistic SCADA data based on:
 python src/data/synthetic_data_generator.py
 ```
 
-This will create data for turbines distributed across:
-- Chitradurga district
-- Gadag district  
-- Davangere district
+This will create data for **30 turbines** distributed across **10 districts**:
+- 3 turbines per district
+- Total: 30 turbines across Karnataka
 
 ### 2. Train Models
 

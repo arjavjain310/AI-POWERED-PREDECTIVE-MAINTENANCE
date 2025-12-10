@@ -5,7 +5,7 @@ data:
   raw_data_path: "data/raw"
   processed_data_path: "data/processed"
   synthetic_data_file: "data/raw/wind_turbine_scada_karnataka.csv"
-  num_turbines: 10
+  num_turbines: 30
   data_start_date: "2023-01-01"
   data_end_date: "2023-12-31"
   sampling_interval_minutes: 10
