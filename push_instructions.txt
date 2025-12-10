@@ -1,0 +1,44 @@
+========================================
+PUSH TO GITHUB - QUICK INSTRUCTIONS
+========================================
+
+Your project is ready to push! Here are 3 easy ways:
+
+METHOD 1: Using the Script (Easiest)
+-------------------------------------
+Run this command:
+  ./push_to_github.sh
+
+When prompted:
+  Username: arjavjain310
+  Password: [Use Personal Access Token - see below]
+
+METHOD 2: Manual Push with Token
+----------------------------------
+1. Get a Personal Access Token:
+   - Visit: https://github.com/settings/tokens
+   - Click "Generate new token (classic)"
+   - Name: "Predictive Maintenance"
+   - Select scope: "repo"
+   - Generate and COPY the token
+
+2. Push:
+   git push -u origin main
+   
+   When asked:
+   - Username: arjavjain310
+   - Password: [Paste your token]
+
+METHOD 3: Using GitHub Desktop
+--------------------------------
+1. Open GitHub Desktop
+2. File → Add Local Repository
+3. Select: /Users/arjavjain/Desktop/MAJOR PROJECT
+4. Click "Publish repository"
+5. Uncheck "Keep this code private" (if you want it public)
+6. Click "Publish repository"
+
+========================================
+Your Repository URL:
+https://github.com/arjavjain310/AI-POWERED-PREDECTIVE-MAINTENANCE.git
+========================================
