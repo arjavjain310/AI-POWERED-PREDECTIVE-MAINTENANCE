@@ -230,14 +230,48 @@ def main():
                 # Generate smaller dataset for quick loading
                 temp_path = data_dir / "wind_turbine_scada_karnataka.csv"
                 
+                # Generate data with all 10 districts
+                # IMPORTANT: Need at least 10 turbines to distribute across 10 districts
+                st.info("🔄 Generating data with all 10 Karnataka districts...")
                 generator = SyntheticSCADAGenerator(
-                    num_turbines=30,  # Full dataset with all districts
+                    num_turbines=30,  # 30 turbines = 3 per district across 10 districts
                     start_date="2023-01-01",
                     end_date="2023-12-31",  # Full year
                     interval_minutes=10,  # Standard interval
                     region="Karnataka"
                 )
+                # Generate with district distribution
                 df = generator.generate_all_data(save_path=str(temp_path), distribute_districts=True)
+                
+                # Verify districts were generated correctly
+                if 'district' in df.columns:
+                    districts_generated = df['district'].nunique()
+                    turbines_generated = df['turbine_id'].nunique()
+                    
+                    if districts_generated < 10:
+                        st.error(f"❌ Only {districts_generated} districts generated. Expected 10.")
+                        st.info("🔄 Regenerating with explicit district assignment...")
+                        # Regenerate ensuring all districts
+                        all_data = []
+                        turbine_id = 1
+                        from src.data.synthetic_data_generator import KARNATAKA_DISTRICTS
+                        turbines_per_district = 30 // len(KARNATAKA_DISTRICTS)  # 3 per district
+                        
+                        for district in KARNATAKA_DISTRICTS:
+                            generator.district = district
+                            for _ in range(turbines_per_district):
+                                df_turbine = generator.generate_turbine_data(turbine_id)
+                                all_data.append(df_turbine)
+                                turbine_id += 1
+                        
+                        df = pd.concat(all_data, ignore_index=True)
+                        df.to_csv(temp_path, index=False)
+                        districts_generated = df['district'].nunique()
+                        st.success(f"✅ Regenerated with {districts_generated} districts, {df['turbine_id'].nunique()} turbines")
+                    else:
+                        st.success(f"✅ Generated {districts_generated} districts with {turbines_generated} turbines")
+                else:
+                    st.error("❌ District column missing in generated data!")
                 data_file = str(temp_path)
                 st.success("✅ Sample data generated successfully!")
                 st.cache_data.clear()  # Clear cache to reload new data
