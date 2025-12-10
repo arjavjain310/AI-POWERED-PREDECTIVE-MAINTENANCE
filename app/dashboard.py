@@ -219,29 +219,45 @@ def main():
         st.info("📊 Data file not found. Generating sample data for demonstration...")
         with st.spinner("Generating Karnataka wind farm data (this may take 30-60 seconds)..."):
             try:
-                from src.data.synthetic_data_generator import SyntheticSCADAGenerator
+                # Import with error handling
+                try:
+                    from src.data.synthetic_data_generator import SyntheticSCADAGenerator, KARNATAKA_DISTRICTS
+                except ImportError as import_err:
+                    st.error(f"❌ Import error: {import_err}")
+                    st.info("Please ensure all dependencies are installed.")
+                    return
+                
                 import tempfile
                 import os
                 
                 # Create data directory if it doesn't exist
-                data_dir = Path("data/raw")
-                data_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Generate smaller dataset for quick loading
-                temp_path = data_dir / "wind_turbine_scada_karnataka.csv"
+                try:
+                    data_dir = Path("data/raw")
+                    data_dir.mkdir(parents=True, exist_ok=True)
+                    temp_path = data_dir / "wind_turbine_scada_karnataka.csv"
+                except Exception as path_err:
+                    st.error(f"❌ Error creating data directory: {path_err}")
+                    return
                 
                 # Generate data with 5 districts and 10 turbines
                 # 10 turbines = 2 per district across 5 districts
                 st.info("🔄 Generating data with 5 Karnataka districts and 10 turbines...")
-                generator = SyntheticSCADAGenerator(
-                    num_turbines=10,  # 10 turbines = 2 per district across 5 districts
-                    start_date="2023-01-01",
-                    end_date="2023-12-31",  # Full year
-                    interval_minutes=10,  # Standard interval
-                    region="Karnataka"
-                )
-                # Generate with district distribution
-                df = generator.generate_all_data(save_path=str(temp_path), distribute_districts=True)
+                try:
+                    generator = SyntheticSCADAGenerator(
+                        num_turbines=10,  # 10 turbines = 2 per district across 5 districts
+                        start_date="2023-01-01",
+                        end_date="2023-12-31",  # Full year
+                        interval_minutes=10,  # Standard interval
+                        region="Karnataka"
+                    )
+                    # Generate with district distribution
+                    df = generator.generate_all_data(save_path=str(temp_path), distribute_districts=True)
+                except Exception as gen_err:
+                    st.error(f"❌ Error during data generation: {gen_err}")
+                    import traceback
+                    with st.expander("Show error details"):
+                        st.code(traceback.format_exc())
+                    return
                 
                 # Verify districts were generated correctly
                 if 'district' in df.columns:
