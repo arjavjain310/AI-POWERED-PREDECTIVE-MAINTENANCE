@@ -272,16 +272,18 @@ def main():
             st.rerun()  # Retry with data generation
         return
     
-    # Global filters
-    turbine_ids = sorted(data['turbine_id'].unique())
-    all_districts = sorted(data['district'].unique()) if 'district' in data.columns else []
+    # Global filters - get counts from full dataset BEFORE filtering
+    all_turbine_ids = sorted(data['turbine_id'].unique())
+    all_districts_list = sorted(data['district'].unique()) if 'district' in data.columns else []
+    total_turbines = len(all_turbine_ids)
+    total_districts = len(all_districts_list)
     
     # District filter dropdown (if available)
-    if 'district' in data.columns and len(all_districts) > 0:
+    if 'district' in data.columns and len(all_districts_list) > 0:
         st.sidebar.markdown("### 📍 Karnataka Districts")
         
         # Add "All Districts" option
-        district_options = ["All Districts"] + all_districts
+        district_options = ["All Districts"] + all_districts_list
         selected_district = st.sidebar.selectbox(
             "Select District",
             district_options,
@@ -289,16 +291,18 @@ def main():
             key="district_selector"
         )
         
+        # Filter data based on district selection
         if selected_district != "All Districts":
-            filtered_data_by_district = data[data['district'] == selected_district].copy()
-            turbine_ids = sorted(filtered_data_by_district['turbine_id'].unique())
-            st.sidebar.info(f"📍 Showing data for: **{selected_district}** ({len(turbine_ids)} turbines)")
-        else:
+            data = data[data['district'] == selected_district].copy()
             turbine_ids = sorted(data['turbine_id'].unique())
-            st.sidebar.info(f"📍 Showing data for: **All Districts** ({len(all_districts)} districts, {len(turbine_ids)} turbines)")
+            num_turbines_in_district = len(turbine_ids)
+            st.sidebar.info(f"📍 **{selected_district}**\n\n🌬️ {num_turbines_in_district} turbines")
+        else:
+            turbine_ids = all_turbine_ids
+            st.sidebar.info(f"📍 **All Districts**\n\n📊 {total_districts} districts\n🌬️ {total_turbines} turbines")
     else:
         selected_district = "All Districts"
-        filtered_data_by_district = data
+        turbine_ids = all_turbine_ids
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🌬️ Turbine Selection")
@@ -317,10 +321,6 @@ def main():
         key="turbine_selector",
         max_selections=max_turbines
     )
-    
-    # Apply district filter to data if district was selected
-    if selected_district != "All Districts" and 'district' in data.columns:
-        data = data[data['district'] == selected_district].copy()
     
     if len(selected_turbines) == 0:
         st.warning("Please select at least one turbine")
