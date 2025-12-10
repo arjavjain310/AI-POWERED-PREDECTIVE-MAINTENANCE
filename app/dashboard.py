@@ -252,22 +252,28 @@ def main():
                         st.error(f"❌ Only {districts_generated} districts generated. Expected 5.")
                         st.info("🔄 Regenerating with explicit district assignment...")
                         # Regenerate ensuring all districts
-                        all_data = []
-                        turbine_id = 1
-                        from src.data.synthetic_data_generator import KARNATAKA_DISTRICTS
-                        turbines_per_district = 10 // len(KARNATAKA_DISTRICTS)  # 2 per district
-                        
-                        for district in KARNATAKA_DISTRICTS:
-                            generator.district = district
-                            for _ in range(turbines_per_district):
-                                df_turbine = generator.generate_turbine_data(turbine_id)
-                                all_data.append(df_turbine)
-                                turbine_id += 1
-                        
-                        df = pd.concat(all_data, ignore_index=True)
-                        df.to_csv(temp_path, index=False)
-                        districts_generated = df['district'].nunique()
-                        st.success(f"✅ Regenerated with {districts_generated} districts, {df['turbine_id'].nunique()} turbines")
+                        try:
+                            all_data = []
+                            turbine_id = 1
+                            from src.data.synthetic_data_generator import KARNATAKA_DISTRICTS
+                            turbines_per_district = 10 // len(KARNATAKA_DISTRICTS)  # 2 per district
+                            
+                            for district in KARNATAKA_DISTRICTS:
+                                generator.district = district
+                                for _ in range(turbines_per_district):
+                                    df_turbine = generator.generate_turbine_data(turbine_id)
+                                    all_data.append(df_turbine)
+                                    turbine_id += 1
+                            
+                            df = pd.concat(all_data, ignore_index=True)
+                            df.to_csv(temp_path, index=False)
+                            districts_generated = df['district'].nunique()
+                            st.success(f"✅ Regenerated with {districts_generated} districts, {df['turbine_id'].nunique()} turbines")
+                        except Exception as regen_error:
+                            st.error(f"❌ Error during regeneration: {str(regen_error)}")
+                            import traceback
+                            with st.expander("Show error details"):
+                                st.code(traceback.format_exc())
                     else:
                         st.success(f"✅ Generated {districts_generated} districts with {turbines_generated} turbines")
                 else:
