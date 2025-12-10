@@ -198,11 +198,47 @@ def main():
     # Load data
     data_path = config['data']['synthetic_data_file']
     
-    if not Path(data_path).exists():
-        st.warning(f"Data file not found at {data_path}")
-        st.info("Please run the synthetic data generator first:")
-        st.code("python src/data/synthetic_data_generator.py")
-        return
+    # Try multiple paths for deployment
+    possible_paths = [
+        data_path,
+        Path("data/raw/wind_turbine_scada_karnataka.csv"),
+        Path("data/raw/wind_turbine_scada.csv"),
+    ]
+    
+    data_file = None
+    for path in possible_paths:
+        if Path(path).exists():
+            data_file = path
+            break
+    
+    if data_file is None:
+        # Generate data on the fly if not found (for deployment)
+        with st.spinner("Generating sample data (this may take a moment)..."):
+            try:
+                from src.data.synthetic_data_generator import SyntheticSCADAGenerator
+                import tempfile
+                import os
+                
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
+                temp_path = temp_file.name
+                temp_file.close()
+                
+                generator = SyntheticSCADAGenerator(
+                    num_turbines=5,  # Smaller for quick generation
+                    start_date="2023-01-01",
+                    end_date="2023-06-30",  # 6 months for faster generation
+                    interval_minutes=30,  # Less frequent for smaller file
+                    region="Karnataka"
+                )
+                df = generator.generate_all_data(save_path=temp_path, distribute_districts=False)
+                data_file = temp_path
+                st.success("✅ Sample data generated!")
+            except Exception as e:
+                st.error(f"Could not generate data: {e}")
+                st.info("Please ensure data file exists or check the error above.")
+                return
+    else:
+        data_path = data_file
     
     try:
         if not st.session_state.data_loaded:
