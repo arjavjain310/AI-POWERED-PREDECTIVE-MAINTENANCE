@@ -11,6 +11,48 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _parse_datetime_series(series: pd.Series) -> pd.Series:
+    """
+    Parse a Series to datetimes while tolerating mixed formats.
+    """
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return pd.to_datetime(series, errors='coerce')
+
+    cleaned = series.astype(str).str.strip() if series.dtype == object else series
+
+    # `format='mixed'` is available in newer pandas versions and
+    # handles heterogeneous timestamp strings better.
+    try:
+        return pd.to_datetime(cleaned, errors='coerce', format='mixed')
+    except TypeError:
+        return pd.to_datetime(cleaned, errors='coerce')
+
+
+def _is_timestamp_candidate(column_name: str, series: pd.Series) -> bool:
+    """Heuristic for choosing fallback timestamp columns."""
+    name = column_name.lower()
+    if any(token in name for token in ("time", "date", "stamp")):
+        return True
+
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return True
+
+    return pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series)
+
+
+def _is_plausible_datetime_series(series: pd.Series) -> bool:
+    """
+    Validate that parsed datetimes look like real operational timestamps.
+    """
+    valid = series.dropna()
+    if valid.empty:
+        return False
+
+    # Protect against accidental parsing of counters/IDs as unix-nanoseconds.
+    valid_ratio = valid.dt.year.between(1990, 2100).mean()
+    return bool(valid_ratio >= 0.8)
+
+
 def load_scada_data(data_path: str) -> pd.DataFrame:
     """
     Load SCADA data from CSV file.
@@ -29,9 +71,61 @@ def load_scada_data(data_path: str) -> pd.DataFrame:
     logger.info(f"Loading data from {data_path}")
     df = pd.read_csv(data_path)
     
-    # Convert timestamp to datetime
-    if 'timestamp' in df.columns:
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+    if 'timestamp' not in df.columns:
+        raise ValueError(
+            f"Required 'timestamp' column not found in {data_path}. "
+            f"Available columns: {list(df.columns)}"
+        )
+
+    parsed_timestamp = _parse_datetime_series(df['timestamp'])
+
+    if pd.api.types.is_numeric_dtype(df['timestamp']) and not _is_plausible_datetime_series(parsed_timestamp):
+        parsed_timestamp = pd.Series(pd.NaT, index=df.index, dtype='datetime64[ns]')
+
+    # Fallback: if timestamp parsing fails completely, try likely datetime columns.
+    if parsed_timestamp.notna().sum() == 0:
+        best_col = None
+        best_parsed = parsed_timestamp
+        best_valid_count = 0
+
+        for col in df.columns:
+            if col == 'timestamp' or not _is_timestamp_candidate(col, df[col]):
+                continue
+
+            candidate_parsed = _parse_datetime_series(df[col])
+            valid_count = int(candidate_parsed.notna().sum())
+
+            if valid_count > best_valid_count and _is_plausible_datetime_series(candidate_parsed):
+                best_valid_count = valid_count
+                best_col = col
+                best_parsed = candidate_parsed
+
+        if best_col and best_valid_count > 0:
+            logger.warning(
+                "Could not parse 'timestamp' in %s. Using '%s' as timestamp source.",
+                data_path,
+                best_col
+            )
+            parsed_timestamp = best_parsed
+        else:
+            sample_values = df['timestamp'].astype(str).head(5).tolist()
+            raise ValueError(
+                f"Could not parse any timestamps from {data_path}. "
+                f"Sample 'timestamp' values: {sample_values}"
+            )
+
+    invalid_mask = parsed_timestamp.isna()
+    invalid_count = int(invalid_mask.sum())
+    if invalid_count > 0:
+        logger.warning(
+            "Dropping %d rows with invalid timestamps from %s",
+            invalid_count,
+            data_path
+        )
+        df = df.loc[~invalid_mask].copy()
+        parsed_timestamp = parsed_timestamp.loc[~invalid_mask]
+
+    df['timestamp'] = parsed_timestamp
     
     logger.info(f"Loaded {len(df)} records")
     logger.info(f"Columns: {list(df.columns)}")

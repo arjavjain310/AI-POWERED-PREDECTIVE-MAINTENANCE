@@ -46,6 +46,39 @@ def test_data_loading(sample_data, tmp_path):
     assert isinstance(loaded_data['timestamp'].iloc[0], pd.Timestamp)
 
 
+def test_data_loading_drops_invalid_timestamp_rows(tmp_path):
+    """Loader should tolerate and drop malformed timestamp rows."""
+    data_path = tmp_path / "test_invalid_timestamps.csv"
+    dirty_df = pd.DataFrame({
+        'timestamp': ['2023-01-01 00:00:00', '1', '2023-01-01 00:20:00'],
+        'turbine_id': [1, 1, 1],
+        'power_output': [450.0, 451.0, 452.0]
+    })
+    dirty_df.to_csv(data_path, index=False)
+
+    loaded_data = load_scada_data(str(data_path))
+
+    assert len(loaded_data) == 2
+    assert loaded_data['timestamp'].isna().sum() == 0
+    assert all(isinstance(ts, pd.Timestamp) for ts in loaded_data['timestamp'])
+
+
+def test_data_loading_fallbacks_to_alternative_datetime_column(tmp_path):
+    """Loader should recover when 'timestamp' column is invalid numeric data."""
+    data_path = tmp_path / "test_fallback_timestamp.csv"
+    df = pd.DataFrame({
+        'timestamp': [1, 2, 3],
+        'event_time': ['2023-02-01 00:00:00', '2023-02-01 00:10:00', '2023-02-01 00:20:00'],
+        'turbine_id': [1, 1, 1]
+    })
+    df.to_csv(data_path, index=False)
+
+    loaded_data = load_scada_data(str(data_path))
+    expected = pd.to_datetime(df['event_time'])
+
+    assert loaded_data['timestamp'].tolist() == expected.tolist()
+
+
 def test_data_splitting(sample_data):
     """Test data splitting."""
     train_df, val_df, test_df = split_data_by_time(
