@@ -368,11 +368,10 @@ def main():
         else:
             data = st.session_state.data.copy()  # Use copy to avoid modifying cached data
     except Exception as e:
-        error_msg = str(e)
         repaired = False
 
-        if "time data" in error_msg or "doesn't match format" in error_msg:
-            st.warning("⚠️ Detected malformed timestamp values. Attempting automatic data repair...")
+        if Path(data_path).exists():
+            st.warning("⚠️ Data load failed. Attempting automatic timestamp repair...")
             repaired = attempt_timestamp_repair(data_path)
             if repaired:
                 st.cache_data.clear()
