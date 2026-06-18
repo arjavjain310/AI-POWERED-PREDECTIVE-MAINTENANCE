@@ -79,6 +79,22 @@ def test_data_loading_fallbacks_to_alternative_datetime_column(tmp_path):
     assert loaded_data['timestamp'].tolist() == expected.tolist()
 
 
+def test_data_loading_fallbacks_when_timestamp_is_numeric_strings(tmp_path):
+    """Loader should fallback when timestamp values are numeric strings."""
+    data_path = tmp_path / "test_numeric_string_timestamp.csv"
+    df = pd.DataFrame({
+        'timestamp': ['1', '2', '3'],
+        'event_time': ['2023-03-01 00:00:00', '2023-03-01 00:10:00', '2023-03-01 00:20:00'],
+        'turbine_id': [2, 2, 2]
+    })
+    df.to_csv(data_path, index=False)
+
+    loaded_data = load_scada_data(str(data_path))
+    expected = pd.to_datetime(df['event_time'])
+
+    assert loaded_data['timestamp'].tolist() == expected.tolist()
+
+
 def test_data_splitting(sample_data):
     """Test data splitting."""
     train_df, val_df, test_df = split_data_by_time(

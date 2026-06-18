@@ -18,6 +18,16 @@ def _parse_datetime_series(series: pd.Series) -> pd.Series:
     if pd.api.types.is_datetime64_any_dtype(series):
         return pd.to_datetime(series, errors='coerce')
 
+    if pd.api.types.is_numeric_dtype(series):
+        numeric = pd.to_numeric(series, errors='coerce')
+        candidates = [pd.to_datetime(numeric, errors='coerce')]
+
+        for unit in ("s", "ms", "us", "ns"):
+            candidates.append(pd.to_datetime(numeric, errors='coerce', unit=unit))
+
+        # Choose the numeric interpretation with the most plausible values.
+        return max(candidates, key=_datetime_plausibility_score)
+
     cleaned = series.astype(str).str.strip() if series.dtype == object else series
 
     # `format='mixed'` is available in newer pandas versions and
@@ -53,6 +63,18 @@ def _is_plausible_datetime_series(series: pd.Series) -> bool:
     return bool(valid_ratio >= 0.8)
 
 
+def _datetime_plausibility_score(series: pd.Series) -> tuple[int, float]:
+    """
+    Ranking score for selecting the best datetime parsing candidate.
+    """
+    valid = series.dropna()
+    if valid.empty:
+        return (0, 0.0)
+
+    plausible_ratio = float(valid.dt.year.between(1990, 2100).mean())
+    return (len(valid), plausible_ratio)
+
+
 def load_scada_data(data_path: str) -> pd.DataFrame:
     """
     Load SCADA data from CSV file.
@@ -78,8 +100,7 @@ def load_scada_data(data_path: str) -> pd.DataFrame:
         )
 
     parsed_timestamp = _parse_datetime_series(df['timestamp'])
-
-    if pd.api.types.is_numeric_dtype(df['timestamp']) and not _is_plausible_datetime_series(parsed_timestamp):
+    if not _is_plausible_datetime_series(parsed_timestamp):
         parsed_timestamp = pd.Series(pd.NaT, index=df.index, dtype='datetime64[ns]')
 
     # Fallback: if timestamp parsing fails completely, try likely datetime columns.
