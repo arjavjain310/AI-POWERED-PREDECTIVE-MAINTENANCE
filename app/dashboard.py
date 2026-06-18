@@ -732,13 +732,27 @@ def show_overview(data: pd.DataFrame, config: dict):
         'maintenance_needed', 'urgency'
     ]].round(3)
     
-    styled_df = display_df.style.applymap(
-        color_maintenance, subset=['maintenance_needed']
-    ).applymap(
-        color_urgency, subset=['urgency']
-    )
+    # Styling can fail in lightweight deployments (e.g., missing jinja2 or
+    # Styler API differences across pandas versions). Fall back to plain table.
+    table_to_render = display_df
+    try:
+        styler = display_df.style
+        if hasattr(styler, "map"):
+            table_to_render = styler.map(
+                color_maintenance, subset=['maintenance_needed']
+            ).map(
+                color_urgency, subset=['urgency']
+            )
+        else:
+            table_to_render = styler.applymap(
+                color_maintenance, subset=['maintenance_needed']
+            ).applymap(
+                color_urgency, subset=['urgency']
+            )
+    except Exception:
+        table_to_render = display_df
     
-    st.dataframe(styled_df, use_container_width=True, height=400)
+    st.dataframe(table_to_render, use_container_width=True, height=400)
     
     # Export button
     csv = turbine_summary.to_csv(index=False)
