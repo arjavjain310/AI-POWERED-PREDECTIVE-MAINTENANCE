@@ -143,7 +143,16 @@ def attempt_timestamp_repair(data_path: str) -> bool:
     """
     try:
         df = pd.read_csv(data_path)
+    except pd.errors.ParserError:
+        try:
+            # Recover from malformed CSV rows by skipping bad lines.
+            df = pd.read_csv(data_path, engine='python', on_bad_lines='skip')
+        except Exception:
+            return False
     except Exception:
+        return False
+
+    if df.empty:
         return False
 
     if 'timestamp' not in df.columns:
@@ -369,6 +378,7 @@ def main():
             data = st.session_state.data.copy()  # Use copy to avoid modifying cached data
     except Exception as e:
         repaired = False
+        loader_error = str(e)
 
         if Path(data_path).exists():
             st.warning("⚠️ Data load failed. Attempting automatic timestamp repair...")
@@ -377,6 +387,16 @@ def main():
                 st.cache_data.clear()
                 st.success("✅ Data repaired successfully. Reloading dashboard...")
                 st.rerun()
+
+            # If CSV is structurally corrupted, remove it and regenerate.
+            if "Error tokenizing data" in loader_error or "Expected" in loader_error and "fields" in loader_error:
+                try:
+                    Path(data_path).unlink(missing_ok=True)
+                    st.warning("⚠️ Corrupted data file removed. Regenerating fresh sample data...")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception:
+                    pass
 
         st.error(f"Error loading data: {e}")
         st.info("💡 **Solution:** The dashboard will try to generate sample data automatically.")

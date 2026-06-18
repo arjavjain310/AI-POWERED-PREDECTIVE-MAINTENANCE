@@ -11,6 +11,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _read_scada_csv(data_path: Path) -> pd.DataFrame:
+    """
+    Read CSV and recover from malformed rows when possible.
+    """
+    try:
+        return pd.read_csv(data_path)
+    except pd.errors.ParserError as exc:
+        logger.warning(
+            "CSV parse error in %s (%s). Retrying with bad-line skipping.",
+            data_path,
+            exc
+        )
+        recovered_df = pd.read_csv(data_path, engine='python', on_bad_lines='skip')
+        if recovered_df.empty:
+            raise ValueError(f"CSV parsing failed and recovery produced no rows: {data_path}") from exc
+        return recovered_df
+
+
 def _parse_datetime_series(series: pd.Series) -> pd.Series:
     """
     Parse a Series to datetimes while tolerating mixed formats.
@@ -91,7 +109,7 @@ def load_scada_data(data_path: str) -> pd.DataFrame:
         raise FileNotFoundError(f"Data file not found: {data_path}")
     
     logger.info(f"Loading data from {data_path}")
-    df = pd.read_csv(data_path)
+    df = _read_scada_csv(data_path)
     
     if 'timestamp' not in df.columns:
         raise ValueError(

@@ -95,6 +95,23 @@ def test_data_loading_fallbacks_when_timestamp_is_numeric_strings(tmp_path):
     assert loaded_data['timestamp'].tolist() == expected.tolist()
 
 
+def test_data_loading_recovers_from_malformed_csv_rows(tmp_path):
+    """Loader should skip malformed CSV rows instead of crashing."""
+    data_path = tmp_path / "test_malformed_rows.csv"
+    data_path.write_text(
+        "timestamp,turbine_id,power_output\n"
+        "2023-01-01 00:00:00,1,100.0\n"
+        "2023-01-01 00:10:00,1,110.0,EXTRA,BAD\n"
+        "2023-01-01 00:20:00,1,120.0\n",
+        encoding="utf-8"
+    )
+
+    loaded_data = load_scada_data(str(data_path))
+
+    assert len(loaded_data) == 2
+    assert loaded_data['timestamp'].isna().sum() == 0
+
+
 def test_data_splitting(sample_data):
     """Test data splitting."""
     train_df, val_df, test_df = split_data_by_time(
