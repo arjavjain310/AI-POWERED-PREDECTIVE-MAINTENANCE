@@ -137,6 +137,54 @@ def load_data_cached(data_path: str):
     return load_scada_data(data_path)
 
 
+def attempt_timestamp_repair(data_path: str) -> bool:
+    """
+    Repair malformed timestamp values in-place and keep only valid rows.
+    """
+    try:
+        df = pd.read_csv(data_path)
+    except Exception:
+        return False
+
+    if 'timestamp' not in df.columns:
+        return False
+
+    parsed = pd.to_datetime(df['timestamp'], errors='coerce')
+
+    # If all values fail, try likely fallback datetime columns.
+    if parsed.notna().sum() == 0:
+        best_col = None
+        best_valid = 0
+        best_parsed = parsed
+
+        for col in df.columns:
+            if col == 'timestamp':
+                continue
+            col_lower = str(col).lower()
+            if not any(token in col_lower for token in ("time", "date", "stamp")):
+                continue
+            candidate = pd.to_datetime(df[col], errors='coerce')
+            valid_count = int(candidate.notna().sum())
+            if valid_count > best_valid:
+                best_valid = valid_count
+                best_col = col
+                best_parsed = candidate
+
+        if best_col is not None and best_valid > 0:
+            parsed = best_parsed
+        else:
+            return False
+
+    invalid_mask = parsed.isna()
+    if invalid_mask.all():
+        return False
+
+    repaired_df = df.loc[~invalid_mask].copy()
+    repaired_df['timestamp'] = parsed.loc[~invalid_mask]
+    repaired_df.to_csv(data_path, index=False)
+    return True
+
+
 @st.cache_data
 def compute_turbine_summary(data: pd.DataFrame):
     """Compute turbine summary statistics."""
@@ -320,13 +368,25 @@ def main():
         else:
             data = st.session_state.data.copy()  # Use copy to avoid modifying cached data
     except Exception as e:
+        error_msg = str(e)
+        repaired = False
+
+        if "time data" in error_msg or "doesn't match format" in error_msg:
+            st.warning("⚠️ Detected malformed timestamp values. Attempting automatic data repair...")
+            repaired = attempt_timestamp_repair(data_path)
+            if repaired:
+                st.cache_data.clear()
+                st.success("✅ Data repaired successfully. Reloading dashboard...")
+                st.rerun()
+
         st.error(f"Error loading data: {e}")
         st.info("💡 **Solution:** The dashboard will try to generate sample data automatically.")
         st.info("If this persists, please generate data first:")
         st.code("python src/data/synthetic_data_generator.py")
-        # Try to generate data automatically
-        if 'data_file' in locals() and data_file is None:
-            st.rerun()  # Retry with data generation
+
+        # If repair failed and file is missing, trigger auto-generation path.
+        if not repaired and 'data_file' in locals() and data_file is None:
+            st.rerun()
         return
     
     # Global filters - get counts from FULL dataset BEFORE any filtering
